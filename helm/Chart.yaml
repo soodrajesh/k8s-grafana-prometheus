@@ -2,4 +2,4 @@ apiVersion: v2
 name: sample-app
 description: A Helm chart for Kubernetes
 version: 0.1.0
-kubeVersion: ">=1.14.0"
+kubeVersion: ">=1.14.0, <1.31.0"  # Adjust this as needed
