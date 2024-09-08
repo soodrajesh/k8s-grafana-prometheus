@@ -5,14 +5,11 @@ on:
     branches:
       - main
       - dev
-  pull_request:
-    branches:
-      - main
-      - dev
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -31,46 +28,32 @@ jobs:
           sudo mv ./kubectl /usr/local/bin/kubectl
           kubectl version --client
 
-      - name: Set up kubeconfig
+      - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
-
-      - name: Log in to Amazon ECR
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY }}
-
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }} .
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}
 
       - name: Install Helm
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
 
-      - name: Deploy to EKS with Helm
+      - name: Deploy with Helm
         run: |
+          helm repo update
+          helm dependency update ./helm
+          
           if [ "${{ github.ref_name }}" = "main" ]; then
             helm upgrade --install sample-app ./helm \
               --values ./helm/helm/values-main.yaml \
               --set image.repository=${{ secrets.ECR_REPOSITORY }} \
               --set image.tag=${{ github.sha }} \
               --namespace default \
-              --create-namespace
+              --create-namespace || { echo 'Helm install/upgrade failed'; exit 1; }
           elif [ "${{ github.ref_name }}" = "dev" ]; then
             helm upgrade --install sample-app ./helm \
               --values ./helm/helm/values-dev.yaml \
               --set image.repository=${{ secrets.ECR_REPOSITORY }} \
               --set image.tag=${{ github.sha }} \
               --namespace default \
-              --create-namespace
+              --create-namespace || { echo 'Helm install/upgrade failed'; exit 1; }
           fi
-
-      - name: Verify deployment
-        run: |
-          kubectl get pods
-          kubectl get svc
-
