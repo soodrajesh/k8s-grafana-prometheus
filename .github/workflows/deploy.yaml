@@ -43,20 +43,29 @@ jobs:
           helm repo add grafana https://grafana.github.io/helm-charts
           helm repo update
 
+      - name: Check if image tag exists in ECR
+        id: check_image
+        run: |
+          if aws ecr describe-images --repository-name my-sample-app --region ${{ secrets.AWS_REGION }} --query "imageDetails[?imageTags[?contains(@, '${{ github.sha }}')]]" --output text; then
+            echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+          fi
+
       - name: Deploy with Helm
         run: |
           if [ "${{ github.ref_name }}" = "main" ]; then
             helm upgrade --install sample-app ./helm \
               --values ./helm/helm/values-main.yaml \
               --set image.repository=${{ secrets.ECR_REPOSITORY }} \
-              --set image.tag=${{ github.sha }} \
+              --set image.tag=${{ env.IMAGE_TAG }} \
               --namespace default \
               --create-namespace || { echo 'Helm install/upgrade failed on main branch'; exit 1; }
           elif [ "${{ github.ref_name }}" = "dev" ]; then
             helm upgrade --install sample-app ./helm \
               --values ./helm/helm/values-dev.yaml \
               --set image.repository=${{ secrets.ECR_REPOSITORY }} \
-              --set image.tag=${{ github.sha }} \
+              --set image.tag=${{ env.IMAGE_TAG }} \
               --namespace default \
               --create-namespace || { echo 'Helm install/upgrade failed on dev branch'; exit 1; }
           fi
