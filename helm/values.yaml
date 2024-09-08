@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: "<your-ecr-repo-url>" # This will be set dynamically during deployment
-  tag: latest
+  tag: "{{ .Values.image.tag }}"  
   pullPolicy: IfNotPresent
 
 service:

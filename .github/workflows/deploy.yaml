@@ -9,63 +9,77 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+    - name: Set up AWS CLI
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Set up kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
-          chmod +x ./kubectl
-          sudo mv ./kubectl /usr/local/bin/kubectl
-          kubectl version --client || { echo 'kubectl installation failed'; exit 1; }
+    - name: Set up kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+        chmod +x ./kubectl
+        sudo mv ./kubectl /usr/local/bin/kubectl
+        kubectl version --client || { echo 'kubectl installation failed'; exit 1; }
 
-      - name: Configure kubectl
-        run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }} || { echo 'Failed to configure kubectl'; exit 1; }
+    - name: Configure kubectl
+      run: |
+        aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }} || { echo 'Failed to configure kubectl'; exit 1; }
 
-      - name: Set up Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          helm version || { echo 'Helm installation failed'; exit 1; }
+    - name: Set up Helm
+      run: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        helm version || { echo 'Helm installation failed'; exit 1; }
 
-      - name: Add Helm repositories
-        run: |
-          helm repo add stable https://charts.helm.sh/stable
-          helm repo add prometheus https://prometheus-community.github.io/helm-charts
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo update
+    - name: Add Helm repositories
+      run: |
+        helm repo add stable https://charts.helm.sh/stable
+        helm repo add prometheus https://prometheus-community.github.io/helm-charts
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo update
 
-      - name: Check if image tag exists in ECR
-        id: check_image
-        run: |
-          if aws ecr describe-images --repository-name my-sample-app --region ${{ secrets.AWS_REGION }} --query "imageDetails[?imageTags[?contains(@, '${{ github.sha }}')]]" --output text; then
-            echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
-          else
-            echo "IMAGE_TAG=latest" >> $GITHUB_ENV
-          fi
+    - name: Check if image tag exists in ECR
+      id: check_image
+      run: |
+        if aws ecr describe-images --repository-name my-sample-app --region ${{ secrets.AWS_REGION }} --query "imageDetails[?imageTags[?contains(@, '${{ github.sha }}')]]" --output text; then
+          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+        else
+          echo "IMAGE_TAG=latest" >> $GITHUB_ENV
+        fi
 
-      - name: Deploy with Helm
-        run: |
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            helm upgrade --install sample-app ./helm \
-              --values ./helm/helm/values-main.yaml \
-              --set image.repository=${{ secrets.ECR_REPOSITORY }} \
-              --set image.tag=${{ env.IMAGE_TAG }} \
-              --namespace default \
-              --create-namespace || { echo 'Helm install/upgrade failed on main branch'; exit 1; }
-          elif [ "${{ github.ref_name }}" = "dev" ]; then
-            helm upgrade --install sample-app ./helm \
-              --values ./helm/helm/values-dev.yaml \
-              --set image.repository=${{ secrets.ECR_REPOSITORY }} \
-              --set image.tag=${{ env.IMAGE_TAG }} \
-              --namespace default \
-              --create-namespace || { echo 'Helm install/upgrade failed on dev branch'; exit 1; }
-          fi
+    - name: Build Docker image
+      run: |
+        docker build -t ${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app:${{ env.IMAGE_TAG }} .
+        docker tag ${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app:${{ env.IMAGE_TAG }} ${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app:latest
+
+    - name: Log in to Amazon ECR
+      run: aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+    - name: Push Docker image to ECR
+      run: |
+        docker push ${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app:${{ env.IMAGE_TAG }}
+        docker push ${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app:latest
+
+    - name: Deploy with Helm
+      run: |
+        if [ "${{ github.ref_name }}" = "main" ]; then
+          helm upgrade --install sample-app ./helm \
+            --values ./helm/helm/values-main.yaml \
+            --set image.repository=${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --namespace default \
+            --create-namespace || { echo 'Helm install/upgrade failed on main branch'; exit 1; }
+        elif [ "${{ github.ref_name }}" = "dev" ]; then
+          helm upgrade --install sample-app ./helm \
+            --values ./helm/helm/values-dev.yaml \
+            --set image.repository=${{ secrets.AWS_ACCOUNT }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/my-sample-app \
+            --set image.tag=${{ env.IMAGE_TAG }} \
+            --namespace default \
+            --create-namespace || { echo 'Helm install/upgrade failed on dev branch'; exit 1; }
+        fi

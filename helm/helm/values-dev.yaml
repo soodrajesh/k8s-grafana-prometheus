@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: your-ecr-repo-url
-  tag: latest
+  tag: appname-dev
   pullPolicy: IfNotPresent
 
 service:
