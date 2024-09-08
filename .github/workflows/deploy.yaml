@@ -22,7 +22,7 @@ jobs:
 
       - name: Set up kubectl
         run: |
-          curl -LO "https://dl.k8s.io/release/v1.27.3/bin/linux/amd64/kubectl"
+          curl -LO "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
           chmod +x ./kubectl
           sudo mv ./kubectl /usr/local/bin/kubectl
           kubectl version --client || { echo 'kubectl installation failed'; exit 1; }

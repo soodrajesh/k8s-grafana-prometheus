@@ -2,4 +2,4 @@ apiVersion: v2
 name: sample-app
 description: A Helm chart for Kubernetes
 version: 0.1.0
-kubeVersion: ">=1.14.0"
+kubeVersion: ">=1.30.0"  # Update to match the Kubernetes version running on EKS
