@@ -1,0 +1,17 @@
+replicaCount: 2
+
+image:
+  repository: your-ecr-repo-url
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+  port: 80
+
+ingress:
+  enabled: true
+  hosts:
+    - host: example.com
+      paths:
+        - /
