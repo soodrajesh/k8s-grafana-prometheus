@@ -1,0 +1,33 @@
+stages:
+  - build
+  - push
+  - deploy
+
+variables:
+  AWS_REGION: "us-west-2"
+  ECR_REGISTRY: "my-sample-app"
+  EKS_CLUSTER_NAME: "demo-eks-cluster"
+  KUBE_NAMESPACE: "default"
+
+before_script:
+  - echo $CI_JOB_TOKEN | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+  - aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+
+build:
+  stage: build
+  script:
+    - docker build -t $ECR_REGISTRY:$CI_COMMIT_SHA .
+    - docker tag $ECR_REGISTRY:$CI_COMMIT_SHA $ECR_REGISTRY:latest
+
+push:
+  stage: push
+  script:
+    - docker push $ECR_REGISTRY:$CI_COMMIT_SHA
+    - docker push $ECR_REGISTRY:latest
+
+deploy:
+  stage: deploy
+  script:
+    - helm upgrade --install sample-app ./helm --set image.repository=$ECR_REGISTRY --set image.tag=$CI_COMMIT_SHA
+    - helm upgrade --install prometheus prometheus-community/prometheus --namespace $KUBE_NAMESPACE
+    - helm upgrade --install grafana grafana/grafana --namespace $KUBE_NAMESPACE

@@ -1,0 +1,12 @@
+replicaCount: 1
+
+image:
+  repository: "<your-ecr-repo-url>" # This will be set dynamically during deployment
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources: {}
