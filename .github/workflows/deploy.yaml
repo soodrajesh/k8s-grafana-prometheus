@@ -33,7 +33,7 @@ jobs:
 
       - name: Set up kubeconfig
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+          aws eks update-kubeconfig --name ${{ secrets.AWS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
       - name: Log in to Amazon ECR
         run: |
@@ -53,14 +53,25 @@ jobs:
 
       - name: Deploy to EKS with Helm
         run: |
-          helm upgrade --install sample-app ./helm \
-            --set image.repository=${{ secrets.ECR_REPOSITORY }} \
-            --set image.tag=${{ github.sha }} \
-            --namespace default \
-            --create-namespace \
-            --values ./helm/values-${{ github.ref_name }}.yaml
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            helm upgrade --install sample-app ./helm \
+              --values ./helm/helm/values-main.yaml \
+              --set image.repository=${{ secrets.ECR_REPOSITORY }} \
+              --set image.tag=${{ github.sha }} \
+              --namespace default \
+              --create-namespace
+          elif [ "${{ github.ref_name }}" = "dev" ]; then
+            helm upgrade --install sample-app ./helm \
+              --values ./helm/helm/values-dev.yaml \
+              --set image.repository=${{ secrets.ECR_REPOSITORY }} \
+              --set image.tag=${{ github.sha }} \
+              --namespace default \
+              --create-namespace
+          fi
 
       - name: Verify deployment
         run: |
           kubectl get pods
           kubectl get svc
+
+          
