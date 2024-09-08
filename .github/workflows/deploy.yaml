@@ -1,4 +1,4 @@
-name: Deploy to EKS
+name: CI/CD Pipeline
 
 on:
   push:
@@ -7,9 +7,8 @@ on:
       - dev
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,31 +20,31 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Install kubectl
+      - name: Set up kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/v1.27.3/bin/linux/amd64/kubectl"
           chmod +x ./kubectl
           sudo mv ./kubectl /usr/local/bin/kubectl
           kubectl version --client
 
-      - name: Update kubeconfig
+      - name: Configure kubectl
         run: |
           aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
 
-      - name: Install Helm
+      - name: Set up Helm
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm version
 
-      - name: Add Helm repository
+      - name: Add Helm repositories
         run: |
-          helm repo add my-repo https://charts.example.com # Replace with your Helm chart repository URL
+          helm repo add stable https://charts.helm.sh/stable
+          helm repo add prometheus https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
           helm repo update
 
       - name: Deploy with Helm
         run: |
-          helm dependency update ./helm
-          
           if [ "${{ github.ref_name }}" = "main" ]; then
             helm upgrade --install sample-app ./helm \
               --values ./helm/helm/values-main.yaml \
