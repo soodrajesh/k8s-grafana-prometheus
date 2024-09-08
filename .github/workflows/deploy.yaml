@@ -25,16 +25,16 @@ jobs:
           curl -LO "https://dl.k8s.io/release/v1.27.3/bin/linux/amd64/kubectl"
           chmod +x ./kubectl
           sudo mv ./kubectl /usr/local/bin/kubectl
-          kubectl version --client
+          kubectl version --client || { echo 'kubectl installation failed'; exit 1; }
 
       - name: Configure kubectl
         run: |
-          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }}
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ secrets.AWS_REGION }} || { echo 'Failed to configure kubectl'; exit 1; }
 
       - name: Set up Helm
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          helm version
+          helm version || { echo 'Helm installation failed'; exit 1; }
 
       - name: Add Helm repositories
         run: |
@@ -51,12 +51,12 @@ jobs:
               --set image.repository=${{ secrets.ECR_REPOSITORY }} \
               --set image.tag=${{ github.sha }} \
               --namespace default \
-              --create-namespace || { echo 'Helm install/upgrade failed'; exit 1; }
+              --create-namespace || { echo 'Helm install/upgrade failed on main branch'; exit 1; }
           elif [ "${{ github.ref_name }}" = "dev" ]; then
             helm upgrade --install sample-app ./helm \
               --values ./helm/helm/values-dev.yaml \
               --set image.repository=${{ secrets.ECR_REPOSITORY }} \
               --set image.tag=${{ github.sha }} \
               --namespace default \
-              --create-namespace || { echo 'Helm install/upgrade failed'; exit 1; }
+              --create-namespace || { echo 'Helm install/upgrade failed on dev branch'; exit 1; }
           fi
