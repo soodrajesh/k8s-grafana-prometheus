@@ -37,9 +37,13 @@ jobs:
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm version
 
+      - name: Add Helm repository
+        run: |
+          helm repo add my-repo https://charts.example.com # Replace with your Helm chart repository URL
+          helm repo update
+
       - name: Deploy with Helm
         run: |
-          helm repo update
           helm dependency update ./helm
           
           if [ "${{ github.ref_name }}" = "main" ]; then
