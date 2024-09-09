@@ -43,8 +43,8 @@ Automate the Docker build, push, and Kubernetes deployment with GitHub Actions.
     -   `AWS_SECRET_ACCESS_KEY`
     -   `AWS_REGION`
     -   `ECR_REPOSITORY`
-    -   `KS_CLUSTER`
-    -
+    -   `EKS_CLUSTER`
+    
 2.  **GitHub Actions Workflow:**
     
     Create a `.github/workflows/deploy.yml` file in your repository. The workflow will:
