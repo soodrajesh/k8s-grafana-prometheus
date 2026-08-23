@@ -195,8 +195,12 @@ alertmanager:
     - name: 'web.hook'
       email_configs:
       - to: 'admin@yourdomain.com'
-        subject: 'Alert: {{ .GroupLabels.alertname }}'
-        body: |
+        # 'subject' and 'body' aren't real email_configs fields (verified live: Alertmanager
+        # 0.26 refuses to start on this — "field body/subject not found in type config.plain").
+        # The subject line is a header; the body is 'html' or 'text'.
+        headers:
+          Subject: 'Alert: {{ .GroupLabels.alertname }}'
+        html: |
           {{ range .Alerts }}
           Alert: {{ .Annotations.summary }}
           Description: {{ .Annotations.description }}
@@ -214,9 +218,15 @@ alertmanager:
 networkPolicies:
   enabled: false
   
-# Service Monitor for custom applications
+# Service Monitor for custom applications.
+# Default false: this chart deploys the standalone prometheus-community/prometheus server,
+# not the Prometheus Operator, so the monitoring.coreos.com/v1 CRD these objects need is not
+# guaranteed to exist. Verified live: with this at true, `helm install` fails outright on a
+# vanilla cluster ("no matches for kind ServiceMonitor") rather than installing harmlessly-inert
+# objects as this repo's README previously (incorrectly) described. Only flip to true if the
+# Prometheus Operator is already running elsewhere in the cluster.
 serviceMonitor:
-  enabled: true
+  enabled: false
   
 # RBAC configuration
 rbac:
